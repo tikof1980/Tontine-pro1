@@ -1,1 +1,128 @@
 
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tontine Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 16px; }
+  h1 { color: #3b1a5c; text-align: center; }
+  h3 { color: #3b1a5c; margin-top: 0; }
+  .card { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  input, select { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+  button { width: 100%; padding: 12px; background: #5b2d8a; color: #fff; border: none; border-radius: 6px; font-size: 16px; margin-top: 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Tontine Pro</h1>
+
+<div class="card">
+  <h3>Nouvelle tontine</h3>
+  <input id="nomTontine" placeholder="Nom de la tontine">
+  <input id="montantTontine" type="number" placeholder="Montant (FCFA)">
+  <select id="periodicite">
+    <option value="mensuel">Mensuel</option>
+    <option value="hebdomadaire">Hebdomadaire</option>
+  </select>
+  <button onclick="creerTontine()">Créer la tontine</button>
+</div>
+
+<div class="card">
+  <h3>Mes tontines</h3>
+  <select id="selectTontine" onchange="chargerMembres()">
+    <option value="">-- Choisir une tontine --</option>
+  </select>
+</div>
+
+<div class="card">
+  <h3>Ajouter un membre</h3>
+  <input id="nomMembre" placeholder="Nom du membre">
+  <input id="telMembre" placeholder="Téléphone">
+  <button onclick="ajouterMembre()">Ajouter le membre</button>
+</div>
+
+<div class="card">
+  <h3>Enregistrer une cotisation</h3>
+  <select id="selectMembre">
+    <option value="">-- Choisir un membre --</option>
+  </select>
+  <input id="montantCot" type="number" placeholder="Montant cotisé">
+  <button onclick="ajouterCotisation()">Enregistrer la cotisation</button>
+</div>
+
+<script>
+const db = supabase.createClient("https://eequklxzvevvomcglbhe.supabase.co", "sb_publishable_dmNLkiwf1IHMY-ef2omg0Q_hVqp_I1n");
+
+async function creerTontine() {
+  const nom = document.getElementById("nomTontine").value.trim();
+  const montant = parseFloat(document.getElementById("montantTontine").value);
+  const periodicite = document.getElementById("periodicite").value;
+  if (!nom || isNaN(montant)) return alert("Saisissez le nom et le montant.");
+  const { error } = await db.from("tontines").insert({ nom, montant, periodicite });
+  if (error) return alert("Erreur : " + error.message);
+  document.getElementById("nomTontine").value = "";
+  document.getElementById("montantTontine").value = "";
+  chargerTontines();
+}
+
+async function chargerTontines() {
+  const { data, error } = await db.from("tontines").select("*").order("date_creation", { ascending: false });
+  if (error) return alert("Erreur chargement tontines : " + error.message);
+  const select = document.getElementById("selectTontine");
+  select.innerHTML = '<option value="">-- Choisir une tontine --</option>';
+  data.forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.nom + " (" + t.montant + " FCFA)";
+    select.appendChild(opt);
+  });
+}
+
+async function chargerMembres() {
+  const tontine_id = document.getElementById("selectTontine").value;
+  const select = document.getElementById("selectMembre");
+  select.innerHTML = '<option value="">-- Choisir un membre --</option>';
+  if (!tontine_id) return;
+  const { data, error } = await db.from("membres").select("*").eq("tontine_id", tontine_id);
+  if (error) return alert("Erreur chargement membres : " + error.message);
+  data.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.nom;
+    select.appendChild(opt);
+  });
+}
+
+async function ajouterMembre() {
+  const tontine_id = document.getElementById("selectTontine").value;
+  const nom = document.getElementById("nomMembre").value.trim();
+  const telephone = document.getElementById("telMembre").value.trim();
+  if (!tontine_id) return alert("Choisissez d'abord une tontine dans « Mes tontines ».");
+  if (!nom) return alert("Saisissez le nom du membre.");
+  const { error } = await db.from("membres").insert({ tontine_id, nom, telephone });
+  if (error) return alert("Erreur : " + error.message);
+  document.getElementById("nomMembre").value = "";
+  document.getElementById("telMembre").value = "";
+  chargerMembres();
+}
+
+async function ajouterCotisation() {
+  const tontine_id = document.getElementById("selectTontine").value;
+  const membre_id = document.getElementById("selectMembre").value;
+  const montant = parseFloat(document.getElementById("montantCot").value);
+  if (!tontine_id) return alert("Choisissez une tontine.");
+  if (!membre_id || isNaN(montant)) return alert("Choisissez un membre et saisissez un montant.");
+  const { error } = await db.from("cotisations").insert({ tontine_id, membre_id, montant });
+  if (error) return alert("Erreur : " + error.message);
+  document.getElementById("montantCot").value = "";
+  alert("Cotisation enregistrée.");
+}
+
+chargerTontines();
+</script>
+
+</body>
+</html>
